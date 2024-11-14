@@ -1,5 +1,5 @@
 import Author from '../models/author'; // Adjust the import to your Author model path
-import { getAuthorList } from '../pages/authors'; // Adjust the import to your function
+import { getAuthorList, showAllAuthors } from '../pages/authors'; // Adjust the import to your function
 
 describe('getAuthorList', () => {
     afterEach(() => {
@@ -113,3 +113,140 @@ describe('getAuthorList', () => {
         expect(result).toEqual([]);
     });
 });
+
+it('should correctly format the lifespan if the date of death is missing', async () => {
+    // Arrange: Set up a sample sorted authors list as returned by the database
+    const sortedAuthors = [
+        {
+            first_name: 'Jane',
+            family_name: 'Austen',
+            date_of_birth: new Date('1775-12-16')
+        },
+        {
+            first_name: 'Amitav',
+            family_name: 'Ghosh',
+            date_of_birth: new Date('1835-11-30'),
+            date_of_death: new Date('1910-04-21')
+        },
+        {
+            first_name: 'Rabindranath',
+            family_name: 'Tagore',
+            date_of_birth: new Date('1812-02-07'),
+            date_of_death: new Date('1870-06-09')
+        }
+    ];
+
+    const mockFind = jest.fn().mockReturnValue({
+        sort: jest.fn().mockResolvedValue(sortedAuthors)
+    });
+
+    Author.find = mockFind;
+
+    const result = await getAuthorList();
+
+    const expectedAuthors = [
+        'Austen, Jane : 1775 - ',
+        'Ghosh, Amitav : 1835 - 1910',
+        'Tagore, Rabindranath : 1812 - 1870'
+    ];
+    expect(result).toEqual(expectedAuthors);
+    expect(mockFind().sort).toHaveBeenCalledWith([['family_name', 'ascending']]);
+});
+
+it('should correctly format the lifespan if the birth date is missing', async () => {
+    const sortedAuthors = [
+        {
+            first_name: 'Jane',
+            family_name: 'Austen',
+            date_of_death: new Date('1817-07-18')
+        },
+        {
+            first_name: 'Amitav',
+            family_name: 'Ghosh',
+            date_of_birth: new Date('1835-11-30'),
+            date_of_death: new Date('1910-04-21')
+        },
+        {
+            first_name: 'Rabindranath',
+            family_name: 'Tagore',
+            date_of_birth: new Date('1812-02-07'),
+            date_of_death: new Date('1870-06-09')
+        }
+    ];
+
+    const mockFind = jest.fn().mockReturnValue({
+        sort: jest.fn().mockResolvedValue(sortedAuthors)
+    });
+
+    Author.find = mockFind;
+
+    const result = await getAuthorList();
+
+    const expectedAuthors = [
+        'Austen, Jane :  - 1817',
+        'Ghosh, Amitav : 1835 - 1910',
+        'Tagore, Rabindranath : 1812 - 1870'
+    ];
+    expect(result).toEqual(expectedAuthors);
+    expect(mockFind().sort).toHaveBeenCalledWith([['family_name', 'ascending']]);
+});
+
+it('should format the lifespan correctly when both birth and death dates are missing', async () => {
+    const sortedAuthors = [
+        {
+            first_name: 'Jane',
+            family_name: 'Austen'
+        },
+        {
+            first_name: 'Amitav',
+            family_name: 'Ghosh',
+            date_of_birth: new Date('1835-11-30'),
+            date_of_death: new Date('1910-04-21')
+        },
+        {
+            first_name: 'Rabindranath',
+            family_name: 'Tagore',
+            date_of_birth: new Date('1812-02-07'),
+            date_of_death: new Date('1870-06-09')
+        }
+    ];
+
+    const mockFind = jest.fn().mockReturnValue({
+        sort: jest.fn().mockResolvedValue(sortedAuthors)
+    });
+
+    Author.find = mockFind;
+
+    const result = await getAuthorList();
+
+    const expectedAuthors = [
+        'Austen, Jane :  - ',
+        'Ghosh, Amitav : 1835 - 1910',
+        'Tagore, Rabindranath : 1812 - 1870'
+    ];
+    expect(result).toEqual(expectedAuthors);
+    expect(mockFind().sort).toHaveBeenCalledWith([['family_name', 'ascending']]);
+});
+
+it('should send the author list if data is available', async () => {
+            const mockSend = jest.fn();
+            const mockRes = { send: mockSend };
+            const mockData = ['Austen, Jane : 1775 - 1817', 'Ghosh, Amitav : 1835 - 1910'];
+            jest.spyOn(require('../pages/authors'), 'getAuthorList').mockResolvedValue(mockData);
+            await showAllAuthors(mockRes as any);
+            expect(mockSend).toHaveBeenCalledWith(mockData);
+        });
+        it('should send a message if no authors are found', async () => {
+            const mockSend = jest.fn();
+            const mockRes = { send: mockSend };
+            jest.spyOn(require('../pages/authors'), 'getAuthorList').mockResolvedValue([]);
+            await showAllAuthors(mockRes as any);
+            expect(mockSend).toHaveBeenCalledWith('No authors found');
+        });
+        it('should send a message if an error occurs', async () => {
+            const mockSend = jest.fn();
+            const mockRes = { send: mockSend };
+            jest.spyOn(require('../pages/authors'), 'getAuthorList').mockRejectedValue(new Error('Database error'));
+            await showAllAuthors(mockRes as any);
+            expect(mockSend).toHaveBeenCalledWith('No authors found');
+        });
